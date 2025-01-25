@@ -1,0 +1,65 @@
+#!/bin/bash
+
+# Exit immediately if a command exits with a non-zero status
+set -e
+
+# Configuration Variables
+APP_NAME="my-app"
+BUILD_DIR="target"
+DEPLOY_SERVER="192.168.1.100"
+DEPLOY_USER="deployuser"
+DEPLOY_DIR="/deployments"
+
+# Function to log messages
+log() {
+    echo "[INFO] $1"
+}
+
+# Step 1: Clone the Repository (if needed, for local test)
+log "Cloning repository..."
+git clone https://github.com/your-repo/$APP_NAME.git || echo "Repo already exists"
+cd $APP_NAME
+
+# Step 2: Build the Application
+log "Building the application..."
+mvn clean install -DskipTests
+
+# Step 3: Run Tests
+log "Running unit tests..."
+mvn test
+
+# Step 4: Package the Application
+log "Packaging the application..."
+ARTIFACT_NAME=$(ls $BUILD_DIR/*.jar | head -n 1)
+if [ -z "$ARTIFACT_NAME" ]; then
+    echo "[ERROR] Build failed. No artifact found."
+    exit 1
+fi
+
+log "Build artifact found: $ARTIFACT_NAME"
+
+# Step 5: Deploy the Application
+log "Deploying to server $DEPLOY_SERVER..."
+scp $ARTIFACT_NAME ${DEPLOY_USER}@${DEPLOY_SERVER}:${DEPLOY_DIR}/
+
+if [ $? -eq 0 ]; then
+    log "Deployment successful!"
+else
+    echo "[ERROR] Deployment failed!"
+    exit 1
+fi
+
+# Step 6: Restart Service on Remote Server (optional)
+log "Restarting application on remote server..."
+ssh ${DEPLOY_USER}@${DEPLOY_SERVER} "systemctl restart ${APP_NAME}"
+
+if [ $? -eq 0 ]; then
+    log "Service restarted successfully!"
+else
+    echo "[ERROR] Failed to restart service!"
+    exit 1
+fi
+
+# Step 7: Cleanup and exit
+log "Pipeline execution completed successfully!"
+exit 0
